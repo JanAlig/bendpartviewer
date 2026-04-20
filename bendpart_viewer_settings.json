@@ -1,5 +1,17 @@
 {
   "default_folder": "",
   "reverse_angle_display": false,
-  "language": "en"
+  "language": "de",
+  "top_color": "#73b8fa",
+  "bottom_color": "#e2a005",
+  "side_color": "#000000",
+  "radius_color": "#80ff00",
+  "background_top_color": "#000000",
+  "background_bottom_color": "#000000",
+  "light_intensity": 1.3928571428571428,
+  "material_lighting": true,
+  "material_ambient": 0.3047619047619048,
+  "material_diffuse": 0.7764423076923077,
+  "material_specular": 0.2980769230769231,
+  "material_specular_power": 36.42857142857142
 }
