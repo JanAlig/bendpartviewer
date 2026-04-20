@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Bendpart Visualizer by Jan Alig.
+Bendpart Viewer by Jan Alig.
 
 This module contains the full desktop viewer for Bendpart files.
 It covers flat 2D drawing, folded 3D rendering, measurement tools,
@@ -30,7 +30,7 @@ from PIL import Image, ImageTk
 import vtk
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from vtkmodules.util.numpy_support import vtk_to_numpy
 
@@ -56,12 +56,24 @@ DEFAULT_SETTINGS = {
     "default_folder": "",
     "reverse_angle_display": False,
     "language": "de",
+    "top_color": "#73b8fa",
+    "bottom_color": "#fcbf3a",
+    "side_color": "#2ead52",
+    "radius_color": "#2ead52",
+    "background_top_color": "#1f2430",
+    "background_bottom_color": "#080a0f",
+    "light_intensity": 1.0,
+    "material_lighting": True,
+    "material_ambient": 0.7,
+    "material_diffuse": 0.0,
+    "material_specular": 1.0,
+    "material_specular_power": 1.0,
 }
 
 TRANSLATIONS = {
     "de": {
-        "app_title": "Bendpart Visualizer by Jan Alig",
-        "app_name": "Bendpart Visualizer",
+        "app_title": "Bendpart Viewer V3.1 by Jan Alig",
+        "app_name": "Bendpart Viewer V3.1",
         "no_file_loaded": "Keine Datei geladen",
         "angle_display": "Winkelanzeige",
         "inside_angle": "Innenwinkel",
@@ -74,6 +86,10 @@ TRANSLATIONS = {
         "special_combos": "spezielle Kombis",
         "sheet_2d": "2D Abwicklung",
         "view_3d": "3D Ansicht",
+        "view_3d_controls": "3D Ansicht",
+        "view_top": "Top",
+        "view_front": "Front",
+        "view_iso": "Iso",
         "file_and_view": "Datei & Ansicht",
         "text_group": "Text",
         "view_3d_loading": "3D Ansicht wird aufgebaut ...",
@@ -90,7 +106,7 @@ TRANSLATIONS = {
         "measure_active": "Messen aktiv",
         "point_measure": "Punktmessung",
         "point_measure_active": "Punktmessung aktiv",
-        "clear_dimensions": "Bemaßung löschen",
+        "clear_dimensions": "Bemassung löschen",
         "text_plus": "Text +",
         "text_minus": "Text -",
         "settings_title": "Einstellungen",
@@ -100,6 +116,20 @@ TRANSLATIONS = {
         "language": "Sprache",
         "german": "Deutsch",
         "english": "Englisch",
+        "top_color": "Oberseite Farbe",
+        "bottom_color": "Unterseite Farbe",
+        "side_color": "Seitenfarbe",
+        "radius_color": "Radiusfarbe",
+        "background_top_color": "Hintergrund oben",
+        "background_bottom_color": "Hintergrund unten",
+        "light_intensity": "Lichtstärke",
+        "material_style": "3D Material",
+        "lighting_enabled": "Beleuchtung aktiv",
+        "ambient": "Ambient",
+        "diffuse": "Diffuse",
+        "specular": "Specular",
+        "specular_power": "Specular Power",
+        "choose_color": "Farbe wählen",
         "cancel": "Abbrechen",
         "save": "Speichern",
         "invalid_folder_title": "Ungültiger Ordner",
@@ -120,8 +150,8 @@ TRANSLATIONS = {
         "status_point_off": "Punktmessung aus",
     },
     "en": {
-        "app_title": "Bendpart Visualizer by Jan Alig",
-        "app_name": "Bendpart Visualizer",
+        "app_title": "Bendpart Viewer V3.1 by Jan Alig",
+        "app_name": "Bendpart Viewer V3.1",
         "no_file_loaded": "No file loaded",
         "angle_display": "Angle display",
         "inside_angle": "Inside angle",
@@ -134,6 +164,10 @@ TRANSLATIONS = {
         "special_combos": "special combos",
         "sheet_2d": "2D Flat Pattern",
         "view_3d": "3D View",
+        "view_3d_controls": "3D View",
+        "view_top": "Top",
+        "view_front": "Front",
+        "view_iso": "Iso",
         "file_and_view": "File & View",
         "text_group": "Text",
         "view_3d_loading": "Building 3D view ...",
@@ -160,6 +194,20 @@ TRANSLATIONS = {
         "language": "Language",
         "german": "German",
         "english": "English",
+        "top_color": "Top color",
+        "bottom_color": "Bottom color",
+        "side_color": "Side color",
+        "radius_color": "Radius color",
+        "background_top_color": "Background top",
+        "background_bottom_color": "Background bottom",
+        "light_intensity": "Light intensity",
+        "material_style": "3D material",
+        "lighting_enabled": "Lighting enabled",
+        "ambient": "Ambient",
+        "diffuse": "Diffuse",
+        "specular": "Specular",
+        "specular_power": "Specular power",
+        "choose_color": "Choose color",
         "cancel": "Cancel",
         "save": "Save",
         "invalid_folder_title": "Invalid folder",
@@ -236,6 +284,21 @@ def load_settings():
     settings["reverse_angle_display"] = bool(settings.get("reverse_angle_display", False))
     if settings.get("language") not in TRANSLATIONS:
         settings["language"] = DEFAULT_SETTINGS["language"]
+    for color_key in ("top_color", "bottom_color", "side_color", "radius_color", "background_top_color", "background_bottom_color"):
+        color_value = settings.get(color_key, DEFAULT_SETTINGS[color_key])
+        if not isinstance(color_value, str) or not color_value.startswith("#") or len(color_value) != 7:
+            settings[color_key] = DEFAULT_SETTINGS[color_key]
+    settings["material_lighting"] = bool(settings.get("material_lighting", DEFAULT_SETTINGS["material_lighting"]))
+    for numeric_key in ("light_intensity", "material_ambient", "material_diffuse", "material_specular", "material_specular_power"):
+        try:
+            settings[numeric_key] = float(settings.get(numeric_key, DEFAULT_SETTINGS[numeric_key]))
+        except Exception:
+            settings[numeric_key] = DEFAULT_SETTINGS[numeric_key]
+    settings["light_intensity"] = min(5.0, max(0.0, settings["light_intensity"]))
+    settings["material_ambient"] = min(1.0, max(0.0, settings["material_ambient"]))
+    settings["material_diffuse"] = min(1.0, max(0.0, settings["material_diffuse"]))
+    settings["material_specular"] = min(1.0, max(0.0, settings["material_specular"]))
+    settings["material_specular_power"] = min(100.0, max(0.0, settings["material_specular_power"]))
     return settings
 
 
@@ -255,6 +318,16 @@ def get_initial_folder(settings, fallback=None):
     return os.getcwd()
 
 
+def hex_to_rgb01(color_value):
+    color_value = (color_value or "").strip()
+    if len(color_value) != 7 or not color_value.startswith("#"):
+        color_value = "#ffffff"
+    try:
+        return tuple(int(color_value[index:index + 2], 16) / 255.0 for index in (1, 3, 5))
+    except ValueError:
+        return (1.0, 1.0, 1.0)
+
+
 def format_display_angle(angle_value, reverse_display=False):
     if abs(angle_value) <= 1e-9:
         return "±0.0°"
@@ -264,6 +337,167 @@ def format_display_angle(angle_value, reverse_display=False):
     if reverse_display:
         magnitude = max(0.0, 180.0 - magnitude)
     return f"{sign}{magnitude:.1f}°"
+
+def format_display_angle(angle_value, reverse_display=False):
+    if abs(angle_value) <= 1e-9:
+        return "+0.0°"
+
+    sign = "+" if angle_value > 0 else "-"
+    magnitude = abs(angle_value)
+    if reverse_display:
+        magnitude = max(0.0, 180.0 - magnitude)
+    return f"{sign}{magnitude:.1f}°"
+
+
+def format_display_angles(angle_values, reverse_display=False):
+    """Format one or more bend-process angles for a single bend label."""
+    cleaned = []
+    for angle_value in angle_values or []:
+        try:
+            cleaned.append(float(angle_value))
+        except (TypeError, ValueError):
+            continue
+
+    if not cleaned:
+        return format_display_angle(0.0, reverse_display=reverse_display)
+    if len(cleaned) == 1:
+        return format_display_angle(cleaned[0], reverse_display=reverse_display)
+    return "\n".join(
+        format_display_angle(angle_value, reverse_display=reverse_display)
+        for angle_value in cleaned
+    )
+
+
+def parse_bend_process_map(root):
+    """Collect process-step angles and operation types per BendId."""
+    process_map = {}
+    bp_root = root.find(".//BendProcesses")
+    if bp_root is None:
+        return process_map
+
+    for bp in bp_root.findall("BendProcess"):
+        bend_id = bp.attrib.get("BendId")
+        if not bend_id:
+            continue
+
+        entry = process_map.setdefault(
+            bend_id,
+            {"angles": [], "geometry_angles": [], "operations": [], "has_hemming": False},
+        )
+
+        operation = (bp.attrib.get("BendOperation") or "").strip()
+        if operation:
+            entry["operations"].append(operation)
+            if "hemming" in operation.lower():
+                entry["has_hemming"] = True
+
+        angle_raw = bp.attrib.get("BendAngle")
+        if angle_raw not in (None, ""):
+            try:
+                process_order = int(bp.attrib.get("ProcessOrder", "0") or 0)
+                angle_value = float(angle_raw)
+            except ValueError:
+                continue
+            entry["angles"].append((process_order, angle_value))
+            entry["geometry_angles"].append((process_order, angle_value))
+
+    for entry in process_map.values():
+        entry["angles"].sort(key=lambda item: item[0])
+        entry["angles"] = [angle_value for _, angle_value in entry["angles"]]
+        entry["geometry_angles"].sort(key=lambda item: item[0])
+        entry["geometry_angles"] = [angle_value for _, angle_value in entry["geometry_angles"]]
+        if entry["has_hemming"] and len(entry["operations"]) > len(entry["angles"]):
+            entry["angles"].append(180.0)
+
+    return process_map
+
+
+def sanitize_bend_lines_for_3d(bend_surface_lines, bend_process_map):
+    """
+    Keep normal bends unchanged, but collapse hemming to a near-180° final fold.
+    """
+    sanitized = []
+    for bend_line in bend_surface_lines:
+        bend_copy = dict(bend_line)
+        angle = float(bend_copy.get("angle") or 0.0)
+        bend_id = bend_copy.get("bend_id")
+        process_info = bend_process_map.get(bend_id, {})
+        if process_info.get("has_hemming"):
+            geometry_angles = process_info.get("geometry_angles") or []
+            direction_source = geometry_angles[-1] if geometry_angles else angle
+            if abs(direction_source) <= 1e-9:
+                direction_source = 1.0
+            bend_copy["angle"] = math.copysign(179.9, direction_source)
+            bend_copy["has_hemming"] = True
+        elif abs(angle) >= 179.5:
+            bend_copy["angle"] = math.copysign(179.9, angle)
+        sanitized.append(bend_copy)
+    return sanitized
+
+
+def collect_surface_branch(start_surface, blocked_surface, bend_surface_lines):
+    """Collect the connected surface branch starting from one side of a bend."""
+    adjacency = {}
+    for bend_line in bend_surface_lines:
+        left_surface = bend_line.get("left_surface")
+        right_surface = bend_line.get("right_surface")
+        if not left_surface or not right_surface:
+            continue
+        adjacency.setdefault(left_surface, set()).add(right_surface)
+        adjacency.setdefault(right_surface, set()).add(left_surface)
+
+    visited = set()
+    stack = [start_surface]
+    while stack:
+        surface_id = stack.pop()
+        if not surface_id or surface_id == blocked_surface or surface_id in visited:
+            continue
+        visited.add(surface_id)
+        for neighbor in adjacency.get(surface_id, ()):
+            if neighbor not in visited and neighbor != blocked_surface:
+                stack.append(neighbor)
+    return visited
+
+
+def apply_hemming_surface_offsets(transforms, bend_surface_lines, thickness):
+    """
+    Move the hem branch away from the mother flange by one sheet thickness.
+
+    The near-180° fold already flips the child branch into the closed shape.
+    What is still missing is the final material offset so the return flange
+    does not sit inside the mother flange.
+    """
+    adjusted = {surface_id: matrix.copy() for surface_id, matrix in transforms.items()}
+
+    for bend_line in bend_surface_lines:
+        if not bend_line.get("has_hemming"):
+            continue
+
+        left_surface = bend_line.get("left_surface")
+        right_surface = bend_line.get("right_surface")
+        if left_surface not in adjusted or right_surface not in adjusted:
+            continue
+
+        branch = collect_surface_branch(right_surface, left_surface, bend_surface_lines)
+        if not branch:
+            continue
+
+        parent_matrix = adjusted[left_surface]
+        parent_normal = np.array(parent_matrix[:3, 2], dtype=float)
+        norm = np.linalg.norm(parent_normal)
+        if norm <= 1e-9:
+            continue
+        parent_normal /= norm
+
+        bend_radius = float(bend_line.get("bend_radius") or 0.0)
+        hem_spacing = float(thickness)
+        translation = -parent_normal * hem_spacing
+
+        for surface_id in branch:
+            adjusted[surface_id] = adjusted[surface_id].copy()
+            adjusted[surface_id][:3, 3] += translation
+
+    return adjusted
 
 
 def translate(language, key, **kwargs):
@@ -511,6 +745,7 @@ def parse_bend_lines(root, meta):
     der Default-Kombi entspricht (is_default_combo).
     """
     bend_lines = []
+    bend_process_map = parse_bend_process_map(root)
 
     default_ut = meta.get("upper_tool")
     default_lt = meta.get("lower_tool")
@@ -581,6 +816,8 @@ def parse_bend_lines(root, meta):
             else:
                 upper_name = lower_name = None
 
+            process_info = bend_process_map.get(bend_id, {})
+
             # Fall back to the default tools if the bend-specific values are empty.
             if upper_name is None:
                 upper_name = default_ut
@@ -602,6 +839,8 @@ def parse_bend_lines(root, meta):
                         "kind": "bend",
                         "bend_id": bend_id,
                         "angle": bend_angle,
+                        "process_angles": list(process_info.get("angles", [])),
+                        "has_hemming": bool(process_info.get("has_hemming", False)),
                         "start": (sx, sy),
                         "end": (ex, ey),
                         "upper_tool": upper_name,
@@ -851,6 +1090,213 @@ def build_surface_base_polygon(surface):
     return polygon
 
 
+def edge_matches_bend(edge_start, edge_end, bend_line, tolerance=1e-6):
+    """Check whether a polygon edge is the same segment as a bend line."""
+    bend_start = bend_line.get("start")
+    bend_end = bend_line.get("end")
+    if bend_start is None or bend_end is None:
+        return False
+
+    def close(a, b):
+        return abs(a[0] - b[0]) <= tolerance and abs(a[1] - b[1]) <= tolerance
+
+    return (
+        (close(edge_start, bend_start) and close(edge_end, bend_end))
+        or (close(edge_start, bend_end) and close(edge_end, bend_start))
+    )
+
+
+def polygon_to_side_polydata(vtk_mod, polygon, transform, thickness, skip_bend_lines=None):
+    """Build vertical side walls by connecting the top and bottom polygon edges."""
+    if polygon is None or polygon.is_empty:
+        return None
+
+    vtk = vtk_mod.vtk
+    polygons = [polygon] if isinstance(polygon, Polygon) else list(polygon.geoms) if isinstance(polygon, MultiPolygon) else []
+    parts = []
+    skip_bend_lines = skip_bend_lines or []
+
+    for shape in polygons:
+        loops = [list(shape.exterior.coords)[:-1]]
+        loops.extend(list(ring.coords)[:-1] for ring in shape.interiors)
+
+        points = vtk.vtkPoints()
+        polys = vtk.vtkCellArray()
+
+        for loop in loops:
+            if len(loop) < 2:
+                continue
+            for index, start in enumerate(loop):
+                end = loop[(index + 1) % len(loop)]
+                if any(edge_matches_bend(start, end, bend_line) for bend_line in skip_bend_lines):
+                    continue
+
+                top_start = transform_surface_point(transform, start[0], start[1], thickness * 0.5)
+                top_end = transform_surface_point(transform, end[0], end[1], thickness * 0.5)
+                bottom_end = transform_surface_point(transform, end[0], end[1], -thickness * 0.5)
+                bottom_start = transform_surface_point(transform, start[0], start[1], -thickness * 0.5)
+
+                start_id = points.InsertNextPoint(*top_start)
+                end_id = points.InsertNextPoint(*top_end)
+                bottom_end_id = points.InsertNextPoint(*bottom_end)
+                bottom_start_id = points.InsertNextPoint(*bottom_start)
+
+                tri_a = vtk.vtkTriangle()
+                tri_a.GetPointIds().SetId(0, start_id)
+                tri_a.GetPointIds().SetId(1, end_id)
+                tri_a.GetPointIds().SetId(2, bottom_end_id)
+                polys.InsertNextCell(tri_a)
+
+                tri_b = vtk.vtkTriangle()
+                tri_b.GetPointIds().SetId(0, start_id)
+                tri_b.GetPointIds().SetId(1, bottom_end_id)
+                tri_b.GetPointIds().SetId(2, bottom_start_id)
+                polys.InsertNextCell(tri_b)
+
+        if points.GetNumberOfPoints() == 0:
+            continue
+
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetPolys(polys)
+        parts.append(polydata)
+
+    return append_polydata(vtk_mod, parts)
+
+
+def add_quad_as_triangles(vtk, polys, a, b, c, d):
+    tri_a = vtk.vtkTriangle()
+    tri_a.GetPointIds().SetId(0, a)
+    tri_a.GetPointIds().SetId(1, b)
+    tri_a.GetPointIds().SetId(2, c)
+    polys.InsertNextCell(tri_a)
+
+    tri_b = vtk.vtkTriangle()
+    tri_b.GetPointIds().SetId(0, a)
+    tri_b.GetPointIds().SetId(1, c)
+    tri_b.GetPointIds().SetId(2, d)
+    polys.InsertNextCell(tri_b)
+
+
+def build_hemming_bend_polydata(vtk_mod, bend_line, transforms, thickness, steps=24):
+    """
+    Build a small rounded connector for hemming bends.
+
+    The standard backend bend-face helper becomes unstable for the final hem
+    close, so we create a lightweight rounded bridge between the parent and
+    child surfaces here.
+    """
+    vtk = vtk_mod.vtk
+    left_surface = bend_line.get("left_surface")
+    right_surface = bend_line.get("right_surface")
+    if left_surface not in transforms or right_surface not in transforms:
+        return None
+
+    start = bend_line.get("start")
+    end = bend_line.get("end")
+    if start is None or end is None:
+        return None
+
+    parent_matrix = transforms[left_surface]
+    child_matrix = transforms[right_surface]
+    parent_top_start = np.array(transform_surface_point(parent_matrix, start[0], start[1], thickness * 0.5), dtype=float)
+    parent_top_end = np.array(transform_surface_point(parent_matrix, end[0], end[1], thickness * 0.5), dtype=float)
+    child_top_start = np.array(transform_surface_point(child_matrix, start[0], start[1], thickness * 0.5), dtype=float)
+    child_top_end = np.array(transform_surface_point(child_matrix, end[0], end[1], thickness * 0.5), dtype=float)
+
+    parent_bottom_start = np.array(transform_surface_point(parent_matrix, start[0], start[1], -thickness * 0.5), dtype=float)
+    parent_bottom_end = np.array(transform_surface_point(parent_matrix, end[0], end[1], -thickness * 0.5), dtype=float)
+    child_bottom_start = np.array(transform_surface_point(child_matrix, start[0], start[1], -thickness * 0.5), dtype=float)
+    child_bottom_end = np.array(transform_surface_point(child_matrix, end[0], end[1], -thickness * 0.5), dtype=float)
+
+    parent_normal = np.array(parent_matrix[:3, 2], dtype=float)
+    child_normal = np.array(child_matrix[:3, 2], dtype=float)
+    parent_norm = np.linalg.norm(parent_normal)
+    child_norm = np.linalg.norm(child_normal)
+    if parent_norm <= 1e-9 or child_norm <= 1e-9:
+        return None
+    parent_normal /= parent_norm
+    child_normal /= child_norm
+
+    axis_direction = parent_top_end - parent_top_start
+    axis_norm = np.linalg.norm(axis_direction)
+    if axis_norm <= 1e-9:
+        return None
+    axis_direction /= axis_norm
+
+    parent_cross = np.array(parent_matrix[:3, 1], dtype=float)
+    parent_cross -= axis_direction * np.dot(parent_cross, axis_direction)
+    parent_cross_norm = np.linalg.norm(parent_cross)
+    if parent_cross_norm <= 1e-9:
+        return None
+    parent_cross /= parent_cross_norm
+
+    child_cross = np.array(child_matrix[:3, 1], dtype=float)
+    child_cross -= axis_direction * np.dot(child_cross, axis_direction)
+    child_cross_norm = np.linalg.norm(child_cross)
+    if child_cross_norm <= 1e-9:
+        return None
+    child_cross /= child_cross_norm
+
+    outer_radius = float(thickness) * 2.0
+    inner_radius = float(0)
+    dot_value = float(np.clip(np.dot(parent_cross, child_cross), -1.0, 1.0))
+    theta = math.acos(dot_value)
+    if theta <= 1e-6:
+        return None
+    outer_handle = outer_radius * (4.0 / 3.0) * math.tan(theta / 4.0)
+    inner_handle = inner_radius * (4.0 / 3.0) * math.tan(theta / 4.0)
+
+    start_top_ids = []
+    end_top_ids = []
+    start_bottom_ids = []
+    end_bottom_ids = []
+    points = vtk.vtkPoints()
+    polys = vtk.vtkCellArray()
+
+    def bezier_point(p0, p1, p2, p3, t):
+        inv_t = 1.0 - t
+        return (
+            (inv_t ** 3) * p0
+            + (3.0 * (inv_t ** 2) * t) * p1
+            + (3.0 * inv_t * (t ** 2)) * p2
+            + (t ** 3) * p3
+        )
+
+    top_start_c1 = parent_top_start + (parent_cross * outer_handle)
+    top_start_c2 = child_top_start - (child_cross * outer_handle)
+    top_end_c1 = parent_top_end + (parent_cross * outer_handle)
+    top_end_c2 = child_top_end - (child_cross * outer_handle)
+
+    bottom_start_c1 = parent_bottom_start + (parent_cross * inner_handle)
+    bottom_start_c2 = child_bottom_start - (child_cross * inner_handle)
+    bottom_end_c1 = parent_bottom_end + (parent_cross * inner_handle)
+    bottom_end_c2 = child_bottom_end - (child_cross * inner_handle)
+
+    for index in range(steps + 1):
+        t = index / steps
+        start_top = bezier_point(parent_top_start, top_start_c1, top_start_c2, child_top_start, t)
+        end_top = bezier_point(parent_top_end, top_end_c1, top_end_c2, child_top_end, t)
+        start_bottom = bezier_point(parent_bottom_start, bottom_start_c1, bottom_start_c2, child_bottom_start, t)
+        end_bottom = bezier_point(parent_bottom_end, bottom_end_c1, bottom_end_c2, child_bottom_end, t)
+
+        start_top_ids.append(points.InsertNextPoint(*start_top))
+        end_top_ids.append(points.InsertNextPoint(*end_top))
+        start_bottom_ids.append(points.InsertNextPoint(*start_bottom))
+        end_bottom_ids.append(points.InsertNextPoint(*end_bottom))
+
+    for index in range(steps):
+        add_quad_as_triangles(vtk, polys, start_top_ids[index], end_top_ids[index], end_top_ids[index + 1], start_top_ids[index + 1])
+        add_quad_as_triangles(vtk, polys, start_bottom_ids[index], start_bottom_ids[index + 1], end_bottom_ids[index + 1], end_bottom_ids[index])
+        add_quad_as_triangles(vtk, polys, start_top_ids[index], start_top_ids[index + 1], start_bottom_ids[index + 1], start_bottom_ids[index])
+        add_quad_as_triangles(vtk, polys, end_top_ids[index], end_bottom_ids[index], end_bottom_ids[index + 1], end_top_ids[index + 1])
+
+    polydata = vtk.vtkPolyData()
+    polydata.SetPoints(points)
+    polydata.SetPolys(polys)
+    return polydata
+
+
 def clip_polygon_with_bend_setback(polygon, bend_line, thickness):
     if polygon is None or polygon.is_empty:
         return polygon
@@ -931,6 +1377,8 @@ def build_trimmed_surface_polygon(surface, bend_lines, thickness):
         return None
 
     for bend_line in bend_lines:
+        if bend_line.get("has_hemming"):
+            continue
         polygon = clip_polygon_with_bend_setback(polygon, bend_line, thickness)
         if polygon is None or polygon.is_empty:
             return polygon
@@ -1004,6 +1452,7 @@ def build_folded_part_polydata(path):
     backend = load_vtk_fold_module()
     root = load_bendpart(path)
     meta = parse_meta(root)
+    bend_process_map = parse_bend_process_map(root)
 
     thickness = meta.get("thickness")
     if thickness is None or thickness <= 0:
@@ -1012,6 +1461,8 @@ def build_folded_part_polydata(path):
     surfaces, bend_surface_lines = backend.parse_surface_model(root)
     if not surfaces:
         raise ValueError("Keine BendSurfaceModel-Geometrie fuer die 3D-Ansicht gefunden.")
+
+    bend_surface_lines = sanitize_bend_lines_for_3d(bend_surface_lines, bend_process_map)
 
     if hasattr(backend, "build_hinge_transforms"):
         transforms, _ = backend.build_hinge_transforms(
@@ -1025,6 +1476,12 @@ def build_folded_part_polydata(path):
             float(thickness),
         )
 
+    transforms = apply_hemming_surface_offsets(
+        transforms,
+        bend_surface_lines,
+        float(thickness),
+    )
+
     bend_lines_by_surface = {}
     for bend_line in bend_surface_lines:
         bend_lines_by_surface.setdefault(bend_line.get("left_surface"), []).append(bend_line)
@@ -1036,9 +1493,10 @@ def build_folded_part_polydata(path):
     bend_parts = []
 
     for surface_id, surface in surfaces.items():
+        attached_bend_lines = bend_lines_by_surface.get(surface_id, [])
         trimmed_polygon = build_trimmed_surface_polygon(
             surface,
-            bend_lines_by_surface.get(surface_id, []),
+            attached_bend_lines,
             float(thickness),
         )
 
@@ -1062,11 +1520,24 @@ def build_folded_part_polydata(path):
             transforms[surface_id],
             -float(thickness) * 0.5,
         )
+        rebuilt_sides = polygon_to_side_polydata(
+            backend,
+            trimmed_polygon,
+            transforms[surface_id],
+            float(thickness),
+            skip_bend_lines=attached_bend_lines,
+        )
         top_parts.append(rebuilt_top if rebuilt_top is not None else parts.get("top"))
         bottom_parts.append(rebuilt_bottom if rebuilt_bottom is not None else parts.get("bottom"))
-        side_parts.append(parts.get("sides"))
+        side_parts.append(rebuilt_sides if rebuilt_sides is not None else parts.get("sides"))
 
     for bend_line in bend_surface_lines:
+        process_info = bend_process_map.get(bend_line.get("bend_id"), {})
+        # Hemming bends are modeled through the folded surfaces here.
+        # The backend bend-face helper produces unstable geometry for these
+        # near-180° cases, so we skip the extra bend-face mesh entirely.
+        if process_info.get("has_hemming"):
+            continue
         bend_faces = backend.build_bend_faces_vtk(
             bend_line,
             surfaces,
@@ -1093,7 +1564,7 @@ def build_folded_part_polydata(path):
     }
 
 
-def make_vtk_actor(vtk_mod, polydata, color, opacity=1.0):
+def make_vtk_actor(vtk_mod, polydata, color, opacity=1.0, material_settings=None):
     if polydata is None or polydata.GetNumberOfPoints() == 0:
         return None
 
@@ -1107,11 +1578,33 @@ def make_vtk_actor(vtk_mod, polydata, color, opacity=1.0):
     prop.SetColor(*color)
     prop.SetOpacity(opacity)
     prop.SetInterpolationToFlat()
-    prop.SetLighting(False)
-    prop.SetAmbient(1.0)
-    prop.SetDiffuse(0.0)
-    prop.SetSpecular(0.0)
-    prop.SetSpecularPower(1.0)
+    material_settings = material_settings or {}
+    prop.SetLighting(bool(material_settings.get("material_lighting", True)))
+    prop.SetAmbient(float(material_settings.get("material_ambient", 0.7)))
+    prop.SetDiffuse(float(material_settings.get("material_diffuse", 0.0)))
+    prop.SetSpecular(float(material_settings.get("material_specular", 1.0)))
+    prop.SetSpecularPower(float(material_settings.get("material_specular_power", 1.0)))
+    return actor
+
+
+def make_vtk_outline_actor(vtk_mod, polydata, renderer):
+    if polydata is None or polydata.GetNumberOfPoints() == 0:
+        return None
+
+    vtk = vtk_mod.vtk
+    silhouette = vtk.vtkPolyDataSilhouette()
+    silhouette.SetInputData(polydata)
+    silhouette.SetCamera(renderer.GetActiveCamera())
+    silhouette.SetEnableFeatureAngle(0)
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputConnection(silhouette.GetOutputPort())
+
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    prop = actor.GetProperty()
+    prop.SetColor(0.03, 0.03, 0.03)
+    prop.SetLineWidth(2.0)
     return actor
 
 
@@ -1119,10 +1612,11 @@ def open_folded_3d_view(path):
     backend = load_vtk_fold_module()
     vtk = backend.vtk
     folded = build_folded_part_polydata(path)
+    settings = load_settings()
 
     renderer = vtk.vtkRenderer()
-    renderer.SetBackground(0.12, 0.14, 0.18)
-    renderer.SetBackground2(0.03, 0.04, 0.06)
+    renderer.SetBackground(*hex_to_rgb01(settings.get("background_top_color")))
+    renderer.SetBackground2(*hex_to_rgb01(settings.get("background_bottom_color")))
     renderer.GradientBackgroundOn()
     try:
         renderer.UseFXAAOn()
@@ -1138,17 +1632,17 @@ def open_folded_3d_view(path):
     interactor.SetRenderWindow(render_window)
     interactor.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
 
-    top_actor = make_vtk_actor(backend, folded["top"], (0.42, 0.66, 0.98))
-    bottom_actor = make_vtk_actor(backend, folded["bottom"], (0.98, 0.72, 0.16))
-    side_actor = make_vtk_actor(backend, folded["sides"], (0.18, 0.68, 0.32))
-    bend_actor = make_vtk_actor(backend, folded.get("bend_faces"), (0.18, 0.68, 0.32))
+    top_actor = make_vtk_actor(backend, folded["top"], hex_to_rgb01(settings.get("top_color")), material_settings=settings)
+    bottom_actor = make_vtk_actor(backend, folded["bottom"], hex_to_rgb01(settings.get("bottom_color")), material_settings=settings)
+    side_actor = make_vtk_actor(backend, folded["sides"], hex_to_rgb01(settings.get("side_color")), material_settings=settings)
+    bend_actor = make_vtk_actor(backend, folded.get("bend_faces"), hex_to_rgb01(settings.get("radius_color")), material_settings=settings)
     for actor in (top_actor, bottom_actor, side_actor, bend_actor):
         if actor is not None:
             renderer.AddActor(actor)
 
     light = vtk.vtkLight()
     light.SetLightTypeToHeadlight()
-    light.SetIntensity(1.0)
+    light.SetIntensity(float(settings.get("light_intensity", DEFAULT_SETTINGS["light_intensity"])))
     renderer.AddLight(light)
 
     axes = vtk.vtkAxesActor()
@@ -1389,6 +1883,8 @@ def draw_part(ax, contours, bend_lines, dim_texts, meta):
             ut = bl.get("upper_tool")
             lt = bl.get("lower_tool")
             combo = (ut, lt)
+            process_angles = bl.get("process_angles") or [angle]
+            text_str = format_display_angles(process_angles, reverse_display=False)
 
             # Only show tool labels when the bend uses a non-default tool setup.
             show_tools = not bl.get("is_default_combo", False) and (ut or lt)
@@ -1590,7 +2086,7 @@ def interactive_dim(initial_path=None):
 
     viewer3d_label = tk.Label(
         viewer3d_frame,
-        bg="#141820",
+        bg=state["settings"].get("background_bottom_color", "#141820"),
         fg="#d8dee9",
         text=tr("view_3d_loading"),
         anchor="center",
@@ -1601,8 +2097,8 @@ def interactive_dim(initial_path=None):
     render_window = vtk.vtkRenderWindow()
     render_window.SetOffScreenRendering(1)
     renderer = vtk.vtkRenderer()
-    renderer.SetBackground(0.12, 0.14, 0.18)
-    renderer.SetBackground2(0.03, 0.04, 0.06)
+    renderer.SetBackground(*hex_to_rgb01(state["settings"].get("background_top_color")))
+    renderer.SetBackground2(*hex_to_rgb01(state["settings"].get("background_bottom_color")))
     renderer.GradientBackgroundOn()
     try:
         renderer.UseFXAAOff()
@@ -1613,6 +2109,10 @@ def interactive_dim(initial_path=None):
         render_window.SetMultiSamples(0)
     except Exception:
         pass
+    preview_light = vtk.vtkLight()
+    preview_light.SetLightTypeToHeadlight()
+    preview_light.SetIntensity(float(state["settings"].get("light_intensity", DEFAULT_SETTINGS["light_intensity"])))
+    renderer.AddLight(preview_light)
     viewer3d_state = {"photo": None, "drag": None, "drag_button": None, "camera_home": None}
 
     def set_status(msg):
@@ -1884,9 +2384,9 @@ def interactive_dim(initial_path=None):
                 px, py = world_to_canvas(point)
                 points.extend((px, py))
             if contour["type"] == "outer":
-                canvas_widget.create_polygon(points, fill="#e0e0e0", outline="black", width=1.0, tags="geom")
+                canvas_widget.create_polygon(points, fill="#e0e0e0", outline="#050505", width=2.0, tags="geom")
             else:
-                canvas_widget.create_polygon(points, fill=BG_COLOR, outline="#dddddd", width=1.0, tags="geom")
+                canvas_widget.create_polygon(points, fill=BG_COLOR, outline="#202020", width=1.2, tags="geom")
 
         seen_ids = set()
         for bend_line in state["bend_lines"]:
@@ -1926,8 +2426,8 @@ def interactive_dim(initial_path=None):
             text_point = (mx + tx * 8.0 + nx * 5.0, my + ty * 8.0 + ny * 5.0)
             text_x, text_y = world_to_canvas(text_point)
 
-            text_value = format_display_angle(
-                angle,
+            text_value = format_display_angles(
+                bend_line.get("process_angles") or [angle],
                 reverse_display=state["settings"].get("reverse_angle_display", False),
             )
 
@@ -2055,6 +2555,39 @@ def interactive_dim(initial_path=None):
         renderer.ResetCameraClippingRange()
         render_3d_snapshot()
 
+    def set_3d_preset_view(mode):
+        if not state["path"]:
+            return
+        bounds = renderer.ComputeVisiblePropBounds()
+        if not bounds or bounds[0] > bounds[1]:
+            return
+
+        center = (
+            (bounds[0] + bounds[1]) * 0.5,
+            (bounds[2] + bounds[3]) * 0.5,
+            (bounds[4] + bounds[5]) * 0.5,
+        )
+        span_x = max(bounds[1] - bounds[0], 1.0)
+        span_y = max(bounds[3] - bounds[2], 1.0)
+        span_z = max(bounds[5] - bounds[4], 1.0)
+        distance = max(span_x, span_y, span_z) * 2.2
+
+        camera = renderer.GetActiveCamera()
+        camera.SetFocalPoint(*center)
+        if mode == "top":
+            camera.SetPosition(center[0], center[1], center[2] + distance)
+            camera.SetViewUp(0.0, 1.0, 0.0)
+        elif mode == "front":
+            camera.SetPosition(center[0], center[1] - distance, center[2])
+            camera.SetViewUp(0.0, 0.0, 1.0)
+        else:
+            camera.SetPosition(center[0] + distance, center[1] - distance, center[2] + distance * 0.75)
+            camera.SetViewUp(0.0, 0.0, 1.0)
+
+        camera.OrthogonalizeViewUp()
+        renderer.ResetCameraClippingRange()
+        render_3d_snapshot()
+
     def render_3d_snapshot():
         width = max(viewer3d_label.winfo_width(), 320)
         height = max(viewer3d_label.winfo_height(), 240)
@@ -2084,19 +2617,47 @@ def interactive_dim(initial_path=None):
     def refresh_3d_view():
         if not state["path"]:
             clear_renderer()
+            viewer3d_label.configure(bg=state["settings"].get("background_bottom_color", "#141820"))
             viewer3d_label.configure(image="", text=tr("view_3d_waiting"))
             viewer3d_label.image = None
             viewer3d_state["photo"] = None
             return
+        viewer3d_label.configure(bg=state["settings"].get("background_bottom_color", "#141820"))
         folded = build_folded_part_polydata(state["path"])
         clear_renderer()
-        top_actor = make_vtk_actor(vtk_backend, folded["top"], (0.45, 0.72, 0.98))
-        bottom_actor = make_vtk_actor(vtk_backend, folded["bottom"], (0.99, 0.76, 0.20))
-        side_actor = make_vtk_actor(vtk_backend, folded["sides"], (0.18, 0.68, 0.32))
-        bend_actor = make_vtk_actor(vtk_backend, folded.get("bend_faces"), (0.18, 0.68, 0.32))
+        top_actor = make_vtk_actor(
+            vtk_backend,
+            folded["top"],
+            hex_to_rgb01(state["settings"].get("top_color")),
+            material_settings=state["settings"],
+        )
+        bottom_actor = make_vtk_actor(
+            vtk_backend,
+            folded["bottom"],
+            hex_to_rgb01(state["settings"].get("bottom_color")),
+            material_settings=state["settings"],
+        )
+        side_actor = make_vtk_actor(
+            vtk_backend,
+            folded["sides"],
+            hex_to_rgb01(state["settings"].get("side_color")),
+            material_settings=state["settings"],
+        )
+        bend_actor = make_vtk_actor(
+            vtk_backend,
+            folded.get("bend_faces"),
+            hex_to_rgb01(state["settings"].get("radius_color")),
+            material_settings=state["settings"],
+        )
         for actor in (top_actor, bottom_actor, side_actor, bend_actor):
             if actor is not None:
                 renderer.AddActor(actor)
+        if renderer.GetLights().GetNumberOfItems() > 0:
+            try:
+                light = renderer.GetLights().GetItemAsObject(0)
+                light.SetIntensity(float(state["settings"].get("light_intensity", DEFAULT_SETTINGS["light_intensity"])))
+            except Exception:
+                pass
         renderer.ResetCamera()
         camera = renderer.GetActiveCamera()
         camera.Azimuth(28)
@@ -2279,6 +2840,18 @@ def interactive_dim(initial_path=None):
         folder_var = tk.StringVar(value=state["settings"].get("default_folder", ""))
         reverse_var = tk.BooleanVar(value=state["settings"].get("reverse_angle_display", False))
         language_var = tk.StringVar(value=state["settings"].get("language", DEFAULT_SETTINGS["language"]))
+        top_color_var = tk.StringVar(value=state["settings"].get("top_color", DEFAULT_SETTINGS["top_color"]))
+        bottom_color_var = tk.StringVar(value=state["settings"].get("bottom_color", DEFAULT_SETTINGS["bottom_color"]))
+        side_color_var = tk.StringVar(value=state["settings"].get("side_color", DEFAULT_SETTINGS["side_color"]))
+        radius_color_var = tk.StringVar(value=state["settings"].get("radius_color", DEFAULT_SETTINGS["radius_color"]))
+        background_top_color_var = tk.StringVar(value=state["settings"].get("background_top_color", DEFAULT_SETTINGS["background_top_color"]))
+        background_bottom_color_var = tk.StringVar(value=state["settings"].get("background_bottom_color", DEFAULT_SETTINGS["background_bottom_color"]))
+        light_intensity_var = tk.DoubleVar(value=state["settings"].get("light_intensity", DEFAULT_SETTINGS["light_intensity"]))
+        lighting_var = tk.BooleanVar(value=state["settings"].get("material_lighting", DEFAULT_SETTINGS["material_lighting"]))
+        ambient_var = tk.DoubleVar(value=state["settings"].get("material_ambient", DEFAULT_SETTINGS["material_ambient"]))
+        diffuse_var = tk.DoubleVar(value=state["settings"].get("material_diffuse", DEFAULT_SETTINGS["material_diffuse"]))
+        specular_var = tk.DoubleVar(value=state["settings"].get("material_specular", DEFAULT_SETTINGS["material_specular"]))
+        specular_power_var = tk.DoubleVar(value=state["settings"].get("material_specular_power", DEFAULT_SETTINGS["material_specular_power"]))
 
         ttk.Label(content, text=tr("default_folder"), style="Meta.TLabel").grid(row=0, column=0, sticky="w")
         folder_entry = ttk.Entry(content, textvariable=folder_var, width=56)
@@ -2307,8 +2880,71 @@ def interactive_dim(initial_path=None):
         ttk.Radiobutton(lang_row, text=tr("german"), value="de", variable=language_var).pack(side="left")
         ttk.Radiobutton(lang_row, text=tr("english"), value="en", variable=language_var).pack(side="left", padx=(12, 0))
 
+        ttk.Label(content, text=tr("top_color"), style="Meta.TLabel").grid(row=6, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(content, text=tr("bottom_color"), style="Meta.TLabel").grid(row=8, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(content, text=tr("side_color"), style="Meta.TLabel").grid(row=10, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(content, text=tr("radius_color"), style="Meta.TLabel").grid(row=12, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(content, text=tr("background_top_color"), style="Meta.TLabel").grid(row=14, column=0, sticky="w", pady=(12, 0))
+        ttk.Label(content, text=tr("background_bottom_color"), style="Meta.TLabel").grid(row=16, column=0, sticky="w", pady=(12, 0))
+
+        def add_color_row(row_index, variable):
+            row = ttk.Frame(content, style="App.TFrame")
+            row.grid(row=row_index, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+            swatch = tk.Label(row, width=4, bg=variable.get(), relief="flat", bd=0)
+            swatch.pack(side="left")
+            entry = ttk.Entry(row, textvariable=variable, width=12)
+            entry.pack(side="left", padx=(10, 10))
+
+            def choose_color():
+                chosen = colorchooser.askcolor(color=variable.get(), parent=dialog, title=tr("choose_color"))
+                if chosen and chosen[1]:
+                    variable.set(chosen[1])
+                    swatch.configure(bg=chosen[1])
+
+            def refresh_swatch(*_args):
+                value = variable.get().strip()
+                if len(value) == 7 and value.startswith("#"):
+                    try:
+                        swatch.configure(bg=value)
+                    except Exception:
+                        pass
+
+            variable.trace_add("write", refresh_swatch)
+            ttk.Button(row, text=tr("choose_color"), style="App.TButton", command=choose_color).pack(side="left")
+
+        add_color_row(7, top_color_var)
+        add_color_row(9, bottom_color_var)
+        add_color_row(11, side_color_var)
+        add_color_row(13, radius_color_var)
+        add_color_row(15, background_top_color_var)
+        add_color_row(17, background_bottom_color_var)
+
+        ttk.Label(content, text=tr("material_style"), style="Meta.TLabel").grid(row=18, column=0, sticky="w", pady=(12, 0))
+        material_frame = ttk.Frame(content, style="App.TFrame")
+        material_frame.grid(row=19, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Checkbutton(material_frame, text=tr("lighting_enabled"), variable=lighting_var).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+
+        def add_slider(parent, row_index, text, variable, from_value, to_value):
+            ttk.Label(parent, text=text, style="Meta.TLabel").grid(row=row_index, column=0, sticky="w", pady=(4, 0))
+            value_label = ttk.Label(parent, text=f"{variable.get():.2f}", style="Meta.TLabel", width=6)
+            value_label.grid(row=row_index, column=1, sticky="e", padx=(8, 0), pady=(4, 0))
+            scale = ttk.Scale(parent, variable=variable, from_=from_value, to=to_value)
+            scale.grid(row=row_index + 1, column=0, columnspan=2, sticky="ew")
+
+            def update_value(*_args):
+                value_label.configure(text=f"{variable.get():.2f}")
+
+            variable.trace_add("write", update_value)
+
+        add_slider(material_frame, 1, tr("light_intensity"), light_intensity_var, 0.0, 5.0)
+        add_slider(material_frame, 3, tr("ambient"), ambient_var, 0.0, 1.0)
+        add_slider(material_frame, 5, tr("diffuse"), diffuse_var, 0.0, 1.0)
+        add_slider(material_frame, 7, tr("specular"), specular_var, 0.0, 1.0)
+        add_slider(material_frame, 9, tr("specular_power"), specular_power_var, 0.0, 50.0)
+        material_frame.columnconfigure(0, weight=1)
+
         button_row = ttk.Frame(content, style="App.TFrame")
-        button_row.grid(row=6, column=0, columnspan=2, sticky="e", pady=(14, 0))
+        button_row.grid(row=20, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
         def save_and_close():
             folder_value = folder_var.get().strip()
@@ -2318,9 +2954,22 @@ def interactive_dim(initial_path=None):
             state["settings"]["default_folder"] = folder_value
             state["settings"]["reverse_angle_display"] = bool(reverse_var.get())
             state["settings"]["language"] = language_var.get() if language_var.get() in TRANSLATIONS else DEFAULT_SETTINGS["language"]
+            state["settings"]["top_color"] = top_color_var.get().strip() or DEFAULT_SETTINGS["top_color"]
+            state["settings"]["bottom_color"] = bottom_color_var.get().strip() or DEFAULT_SETTINGS["bottom_color"]
+            state["settings"]["side_color"] = side_color_var.get().strip() or DEFAULT_SETTINGS["side_color"]
+            state["settings"]["radius_color"] = radius_color_var.get().strip() or DEFAULT_SETTINGS["radius_color"]
+            state["settings"]["background_top_color"] = background_top_color_var.get().strip() or DEFAULT_SETTINGS["background_top_color"]
+            state["settings"]["background_bottom_color"] = background_bottom_color_var.get().strip() or DEFAULT_SETTINGS["background_bottom_color"]
+            state["settings"]["light_intensity"] = min(5.0, max(0.0, float(light_intensity_var.get())))
+            state["settings"]["material_lighting"] = bool(lighting_var.get())
+            state["settings"]["material_ambient"] = min(1.0, max(0.0, float(ambient_var.get())))
+            state["settings"]["material_diffuse"] = min(1.0, max(0.0, float(diffuse_var.get())))
+            state["settings"]["material_specular"] = min(1.0, max(0.0, float(specular_var.get())))
+            state["settings"]["material_specular_power"] = min(100.0, max(0.0, float(specular_power_var.get())))
             save_settings(state["settings"])
             apply_ui_language()
             redraw_geometry(fit_view=False)
+            refresh_3d_view()
             dialog.destroy()
 
         ttk.Button(button_row, text=tr("cancel"), style="App.TButton", command=dialog.destroy).pack(side="right")
@@ -2337,6 +2986,8 @@ def interactive_dim(initial_path=None):
             ui_refs["viewer3d_frame"].configure(text=tr("view_3d"))
         if "file_group" in ui_refs:
             ui_refs["file_group"].configure(text=tr("file_and_view"))
+        if "view3d_group" in ui_refs:
+            ui_refs["view3d_group"].configure(text=tr("view_3d_controls"))
         if "measure_group" in ui_refs:
             ui_refs["measure_group"].configure(text=tr("measure"))
         if "text_group" in ui_refs:
@@ -2349,6 +3000,12 @@ def interactive_dim(initial_path=None):
             ui_refs["btn_rotate_2d"].configure(text=tr("rotate_2d"))
         if "btn_settings" in ui_refs:
             ui_refs["btn_settings"].configure(text=tr("settings"))
+        if "btn_view_top" in ui_refs:
+            ui_refs["btn_view_top"].configure(text=tr("view_top"))
+        if "btn_view_front" in ui_refs:
+            ui_refs["btn_view_front"].configure(text=tr("view_front"))
+        if "btn_view_iso" in ui_refs:
+            ui_refs["btn_view_iso"].configure(text=tr("view_iso"))
         if "btn_clear_dims" in ui_refs:
             ui_refs["btn_clear_dims"].configure(text=tr("clear_dimensions"))
         if "btn_text_plus" in ui_refs:
@@ -2370,6 +3027,7 @@ def interactive_dim(initial_path=None):
         update_info_text()
         if not state["path"]:
             status_var.set(tr("status_measure_off"))
+            viewer3d_label.configure(bg=state["settings"].get("background_bottom_color", "#141820"))
             viewer3d_label.configure(text=tr("view_3d_waiting"))
 
     def fit_2d_view():
@@ -2528,11 +3186,14 @@ def interactive_dim(initial_path=None):
     measure_group.pack(side="left", padx=(0, 10))
     file_group = ttk.LabelFrame(control_groups, text=tr("file_and_view"), style="Card.TLabelframe", padding=6)
     file_group.pack(side="left", padx=(0, 10))
+    view3d_group = ttk.LabelFrame(control_groups, text=tr("view_3d_controls"), style="Card.TLabelframe", padding=6)
+    view3d_group.pack(side="left", padx=(0, 10))
     text_group = ttk.LabelFrame(control_groups, text=tr("text_group"), style="Card.TLabelframe", padding=6)
     text_group.pack(side="left")
     ui_refs["plot_frame"] = plot_frame
     ui_refs["viewer3d_frame"] = viewer3d_frame
     ui_refs["file_group"] = file_group
+    ui_refs["view3d_group"] = view3d_group
     ui_refs["measure_group"] = measure_group
     ui_refs["text_group"] = text_group
 
@@ -2552,6 +3213,13 @@ def interactive_dim(initial_path=None):
     btn_settings = ttk.Button(file_group, text=tr("settings"), style="App.TButton", command=open_settings_dialog)
     btn_settings.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
 
+    btn_view_top = ttk.Button(view3d_group, text=tr("view_top"), style="App.TButton", command=lambda: set_3d_preset_view("top"))
+    btn_view_top.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
+    btn_view_front = ttk.Button(view3d_group, text=tr("view_front"), style="App.TButton", command=lambda: set_3d_preset_view("front"))
+    btn_view_front.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+    btn_view_iso = ttk.Button(view3d_group, text=tr("view_iso"), style="App.TButton", command=lambda: set_3d_preset_view("iso"))
+    btn_view_iso.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+
     btn_text_plus = ttk.Button(text_group, text=tr("text_plus"), style="App.TButton", command=text_plus)
     btn_text_plus.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
     btn_text_minus = ttk.Button(text_group, text=tr("text_minus"), style="App.TButton", command=text_minus)
@@ -2562,6 +3230,9 @@ def interactive_dim(initial_path=None):
             "btn_fit": btn_fit,
             "btn_rotate_2d": btn_rotate_2d,
             "btn_settings": btn_settings,
+            "btn_view_top": btn_view_top,
+            "btn_view_front": btn_view_front,
+            "btn_view_iso": btn_view_iso,
             "btn_measure": btn_measure,
             "btn_pmeasure": btn_pmeasure,
             "btn_clear_dims": btn_clear_dims,
